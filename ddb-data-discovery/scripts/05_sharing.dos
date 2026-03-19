@@ -1,0 +1,89 @@
+// ============================================================
+// 05_sharing.dos — 高级查询与数据共享
+// ============================================================
+// 适用场景：掌握 DolphinDB 独有的 SQL 扩展，做初步分析，共享结果
+// 前置依赖：已通过 01-04 了解数据全貌
+
+// --- 配置参数 (USER CONFIG) ---
+dbPath = "dfs://minute_factor"
+tableName = "stock_minute_1m"
+targetDate = 2026.03.10
+targetStock = "000153.SZ"
+
+t = loadTable(dbPath, tableName)
+
+// ═══════════════════════════════════
+// Part A: DolphinDB SQL 扩展语法示范
+// ═══════════════════════════════════
+
+// ── context by: 分组但不聚合 ──
+// 类似 SQL 窗口函数，但语法更简洁
+// 用途: 在每个分组内做前后行运算，结果填回每一行
+print("=== context by: 分钟收益率 ===")
+// 注意: DDB 中 `\` 是浮点除法，`/` 是整数除法（与大多数语言相反！）
+select top 10 ts_code, trade_time, close,
+       close \ prev(close) - 1 as minute_ret
+from t
+where trade_date = targetDate, ts_code = targetStock
+context by ts_code
+
+// ── pivot by: 行转列 ──
+// 将长表转换为矩阵（宽表），非常适合截面分析
+print("\n=== pivot by: 多股票收盘价矩阵 ===")
+// 取3只股票最后5分钟的close，转成矩阵
+select last(close) from t
+where trade_date = targetDate, ts_code in ["000153.SZ", "000400.SZ", "000423.SZ"]
+pivot by trade_time, ts_code
+
+// ── exec vs select ──
+// exec 返回向量(vector)或标量(scalar)，select 返回表(table)
+print("\n=== exec 返回向量 ===")
+prices = exec close from t where trade_date = targetDate, ts_code = targetStock
+print("类型: vector, 长度: " + string(size(prices)))
+print("均价: " + string(avg(prices)))
+
+// ═══════════════════════════════════
+// Part B: 常用分析模式
+// ═══════════════════════════════════
+
+// ── 日度 VWAP (成交量加权均价) ──
+print("\n=== 日度 VWAP ===")
+select ts_code, trade_date,
+       wavg(close, vol) as vwap,
+       sum(vol) as total_vol
+from t
+where trade_date = targetDate
+group by ts_code, trade_date
+order by total_vol desc limit 10
+
+// ── 每日开盘/收盘价 (first/last) ──
+print("\n=== 每日首尾价 ===")
+select ts_code,
+       first(open) as day_open,
+       last(close) as day_close,
+       last(close) \ first(open) - 1 as day_return
+from t
+where trade_date = targetDate, ts_code = targetStock
+group by ts_code
+
+// ═══════════════════════════════════
+// Part C: 共享内存表
+// ═══════════════════════════════════
+
+// share(table, name): 将内存表发布为全局可见的共享表
+// 其他 session 可以直接 select * from sharedTableName 访问
+// undef(name, SHARED): 释放共享表
+print("\n=== 共享内存表 ===")
+sample = select * from t where trade_date = targetDate, ts_code = targetStock
+sharedName = "shared_sample_data"
+
+try {
+    undef(sharedName, SHARED)     // 先清理同名旧表
+} catch(ex) {}
+
+share(sample, sharedName)
+print("已共享: " + sharedName + " (" + string(sample.size()) + " 行)")
+
+// 验证: 查看共享对象列表
+print("\n=== 当前共享对象 ===")
+select name, type, rows, bytes from objs(true) where shared = true

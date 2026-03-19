@@ -1,0 +1,40 @@
+// 脚本功能：聚合分析 (Aggregation)
+// 包含：Group By (分组), Pivot (透视表), Time-Bucket (时间降采样)
+// 方法论：DolphinDB 的 Map-Reduce 架构使得对海量数据进行 group by 非常高效
+
+// --- 配置参数 (USER CONFIG) ---
+dbPath = "dfs://stockMinKSH"          
+tableName = "stockMinKSH_v2"          
+securityID = "000001.SZ"
+
+// 1. 加载数据
+db = database(dbPath)
+t = loadTable(db, tableName)
+
+// 2. 时间序列降采样 (Downsampling / OHLC)
+// 将分钟线数据聚合为日线数据 (Daily Bars)
+// 使用 `date(DateTime)` 作为分组键
+// wavg(LastPx, Volume) 计算 VWAP (Volume Weighted Average Price) 是金融分析标准操作
+print("--- 正在计算日线聚合 (Daily Aggregation) ---")
+res = select max(HighPx) as High, 
+             min(LowPx) as Low, 
+             sum(Volume) as TotalVol, 
+             wavg(LastPx, Volume) as VWAP 
+      from t 
+      where SecurityID = securityID
+      group by date(DateTime) as Date
+
+print(select top 10 * from res order by Date desc)
+
+// 3. 数据透视表 (Pivot Table)
+// 场景：分析一天中不同小时段的平均价格走势 (Intraday Seasonality)
+// `pivot by` 是一个将长表(Long Format)转换为宽表(Wide Format)的利器
+print("\n--- 正在计算小时均价透视表 (Hourly Pivot) ---")
+// 我们想看每一天(Rows)在不同小时(Cols)的平均价格
+// 注意：pivot by Row, Column
+daily_hourly_pattern = select avg(LastPx) 
+                       from t 
+                       where SecurityID = securityID 
+                       pivot by date(DateTime) as Date, hour(DateTime) as Hour
+
+print(select top 5 * from daily_hourly_pattern order by Date desc)

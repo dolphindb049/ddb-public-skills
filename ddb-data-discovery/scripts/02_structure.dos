@@ -1,0 +1,54 @@
+// ============================================================
+// 02_structure.dos — 表结构透视：列定义、分区方案、存储引擎
+// ============================================================
+// 适用场景：确定目标表后，了解字段含义、数据类型、分区策略
+// 前置依赖：已通过 01_exploration.dos 确认 dbPath 和 tableName
+
+// --- 配置参数 (USER CONFIG) ---
+dbPath = "dfs://minute_factor"
+tableName = "stock_minute_1m"
+
+// ── Step 1: 加载表句柄 ──
+// loadTable 有两种写法都可以:
+//   方式A: t = loadTable(database(dbPath), tableName)
+//   方式B: t = loadTable(dbPath, tableName)           ← 更简洁，推荐
+// 这里只加载元数据，不会拉取实际数据，非常快
+t = loadTable(dbPath, tableName)
+
+// ── Step 2: 获取 Schema 字典 ──
+// schema() 返回一个 dictionary，包含多个 key
+schema_info = t.schema()
+
+// ── Step 3: 列定义 (Column Definitions) ──
+// colDefs 是一个表，包含: name, typeString, typeInt, extra, comment, sensitive
+print("=== 列定义 ===")
+print(schema_info.colDefs)
+
+// ── Step 4: 分区信息 ──
+print("\n=== 分区方案 ===")
+print("分区列: " + concat(string(schema_info.partitionColumnName), ", "))
+print("分区类型: " + concat(string(schema_info.partitionTypeName), ", "))
+// partitionSchema 的格式取决于分区类型:
+//   RANGE: 显示分界点数组   VALUE: 显示枚举值   HASH: 显示桶数
+print("分区详情: ")
+print(schema_info.partitionSchema)
+
+// ── Step 5: 存储引擎信息 (仅 TSDB) ──
+print("\n=== 存储引擎 ===")
+print("引擎类型: " + schema_info.engineType)
+if(schema_info.engineType == "TSDB") {
+    print("排序列 (sortColumns): " + concat(string(schema_info.sortColumns), ", "))
+    print("去重策略 (keepDuplicates): " + schema_info.keepDuplicates)
+}
+
+// ── Step 6: 磁盘占用 ──
+// getTabletsMeta 可以查看表的物理存储信息
+// 参数: (路径通配符, 表名SYMBOL, 是否递归)
+// 注意: 第二个参数需要是 SYMBOL 标量
+//   用 backtick 字面量: `stock_minute_1m (但不能用变量)
+//   用变量: symbol([tableName])[0] 先包成向量再取第一个
+print("\n=== 磁盘占用 ===")
+tablets = getTabletsMeta("/" + dbPath.substr(6) + "/%", symbol([tableName])[0], true)
+total_disk = exec sum(diskUsage) from tablets
+print("总磁盘占用: " + string(total_disk) + " bytes (" + string(total_disk \ 1024 \ 1024) + " MB)")
+print("Tablet 数量: " + string(tablets.size()))

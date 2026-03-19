@@ -1,0 +1,13 @@
+// scripts/dos_samples/moving_average.dos
+// A simple script to demonstrate moving averages
+
+// If your session is not already authenticated, run login("<USER>", "<PASSWORD>") first.
+
+n = 100
+t = table(1..n as id, rand(100.0, n) as price)
+
+// Calculate 5-period and 10-period moving averages
+result = select id, price, mavg(price, 5) as ma5, mavg(price, 10) as ma10 from t
+
+print("Calculated Moving Averages:")
+print(select top 10 * from result)

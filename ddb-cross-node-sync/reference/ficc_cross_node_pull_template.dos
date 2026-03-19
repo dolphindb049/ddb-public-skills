@@ -1,0 +1,68 @@
+// 跨节点拉取 FICC 原始表模板（xdb + remoteRun）
+// 目的：把源节点原始表落到本地节点，供后续 mapping skill 使用
+// 运行前请先替换下面的连接占位符，不要把真实账号密码直接提交到仓库。
+
+// login("YOUR_LOCAL_USER", "YOUR_LOCAL_PASSWORD")
+
+SRC_HOST = "<SRC_HOST>"
+SRC_PORT = 0
+SRC_USER = "<SRC_USER>"
+SRC_PWD  = "<SRC_PASSWORD>"
+SRC_DB   = "dfs://instrument_dbtest2"
+
+LOCAL_DB = "dfs://instrument_dbtest2"
+START_DATE = 2024.01.01
+DRY_RUN = true
+TOP_N = 5000
+DROP_LOCAL_DB_IF_EXISTS = false
+
+if(DROP_LOCAL_DB_IF_EXISTS and existsDatabase(LOCAL_DB)){
+    dropDatabase(LOCAL_DB)
+}
+
+if(!existsDatabase(LOCAL_DB)){
+    database(LOCAL_DB, VALUE, 2020.01.01..2035.12.31)
+}
+
+def pullRemote(conn, scriptText){
+    return remoteRun(conn, scriptText)
+}
+
+def upsertPartitioned(dbPath, tableName, partCol, data){
+    db = database(dbPath)
+    if(!existsTable(dbPath, tableName)){
+        db.createPartitionedTable(data, tableName, partCol)
+    }else{
+        loadTable(dbPath, tableName).append!(data)
+    }
+}
+
+conn = xdb(SRC_HOST, SRC_PORT, SRC_USER, SRC_PWD)
+
+instScript = "select * from loadTable('" + SRC_DB + "','instrument') where listDate >= " + string(START_DATE)
+rateScript = "select * from loadTable('" + SRC_DB + "','getBondRating') where publishDate >= " + string(START_DATE)
+curveScript = "select * from loadTable('" + SRC_DB + "','BondYieldCurveSh') where dataDt >= " + string(START_DATE)
+cfetsScript = "select * from loadTable('" + SRC_DB + "','CFETSValuation') where tradeDate >= " + string(START_DATE)
+
+inst = pullRemote(conn, instScript)
+rate = pullRemote(conn, rateScript)
+curve = pullRemote(conn, curveScript)
+cfets = pullRemote(conn, cfetsScript)
+
+if(DRY_RUN){
+    inst = select * from inst limit TOP_N
+    rate = select * from rate limit TOP_N
+    curve = select * from curve limit TOP_N
+    cfets = select * from cfets limit TOP_N
+}
+
+upsertPartitioned(LOCAL_DB, "instrument", `listDate, inst)
+upsertPartitioned(LOCAL_DB, "getBondRating", `publishDate, rate)
+upsertPartitioned(LOCAL_DB, "BondYieldCurveSh", `dataDt, curve)
+upsertPartitioned(LOCAL_DB, "CFETSValuation", `tradeDate, cfets)
+
+print("==== Cross Node Pull Summary ====")
+print(table(["instrument","getBondRating","BondYieldCurveSh","CFETSValuation"] as tableName,
+            [count(inst), count(rate), count(curve), count(cfets)] as rowCnt))
+
+select count(*) as instrumentCnt from loadTable(LOCAL_DB, "instrument")

@@ -1,0 +1,53 @@
+// ============================================================
+// 03_queries.dos — 数据画像：采样、统计、分布概览
+// ============================================================
+// 适用场景：了解数据规模、时间范围、证券覆盖，快速建立数据直觉
+// 前置依赖：已通过 02_structure.dos 了解表结构
+
+// --- 配置参数 (USER CONFIG) ---
+dbPath = "dfs://minute_factor"
+tableName = "stock_minute_1m"
+
+// ── Step 1: 加载表句柄 ──
+t = loadTable(dbPath, tableName)
+
+// ── Step 2: 总行数 ──
+// 方法A: select count(*) → 返回一行一列的表
+// 方法B: exec count(*) → 返回标量（数字）
+// 方法C: t.size() 或 t.count() → 语法糖，等价于 exec count(*)
+total = exec count(*) from t
+print("=== 总行数: " + string(total) + " ===")
+
+// ── Step 3: 时间范围 ──
+print("\n=== 时间范围 ===")
+select min(trade_date) as min_date, max(trade_date) as max_date from t
+
+// ── Step 4: 去重计数 ──
+// ⚠️ 坑: DolphinDB 不支持 count(distinct col)，会报 "Cannot nest aggregate function"
+// 正确做法: 子查询 或 exec distinct + size
+stock_count = exec count(*) from (select distinct ts_code from t)
+print("\n=== 去重证券数: " + string(stock_count) + " ===")
+
+// ── Step 5: 每日行数分布 ──
+// 快速判断数据是否均匀，是否有某些天缺失或异常多
+print("\n=== 每日行数分布 ===")
+select trade_date, count(*) as row_count from t group by trade_date order by trade_date
+
+// ── Step 6: 采样 ──
+// top N 放在 select 后面（DolphinDB 语法），不是放在末尾
+// 建议带上 where 过滤到一天，避免跨分区扫描
+print("\n=== 采样: 前 5 条 (指定日期) ===")
+select top 5 * from t where trade_date = max(exec max(trade_date) from t)
+
+// ── Step 7: 数值列基础统计 ──
+// 对 OHLCV 做 avg/min/max/std
+print("\n=== 数值统计 (全表) ===")
+select avg(close) as avg_close, std(close) as std_close,
+       min(close) as min_close, max(close) as max_close,
+       avg(vol) as avg_vol, min(vol) as min_vol, max(vol) as max_vol
+from t
+
+// ── Step 8: 类别分布 (Top 10 活跃证券) ──
+print("\n=== 成交量 Top 10 证券 ===")
+select ts_code, sum(vol) as total_vol
+from t group by ts_code order by total_vol desc limit 10

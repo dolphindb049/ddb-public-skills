@@ -1,0 +1,79 @@
+// 脚本功能：假设检验(Hypothesis Testing) 与 相关性分析(Correlation)
+// 包含：相关性矩阵 (Heatmap Basis), T-Test, 手动 T 统计量
+// 方法论：使用向量操作加速矩阵运算，避免逐个 cell 计算
+
+// --- 配置参数 (USER CONFIG) ---
+dbPath = "dfs://stockMinKSH"          
+tableName = "stockMinKSH_v2" 
+// 需要分析的一组股票 (Portfolio)
+securityIDs = ["000001.SZ", "000002.SZ", "600000.SH", "002415.SZ", "300059.SZ", "600104.SH"]
+
+// 1. 加载数据
+db = database(dbPath)
+t = loadTable(db, tableName)
+
+print("加载组合数据...")
+// 使用 SQL `in` 算子高效筛选这组股票
+data = select SecurityID, DateTime, LastPx from t where SecurityID in securityIDs order by DateTime
+
+// 2. 准备收益率矩阵 (Prepare Returns Matrix)
+// 典型的多因子分析第一步：构建 Wide Table
+// 行：时间 (DateTime)
+// 列：不同资产 (SecurityID)
+// 值：收益率 (Returns)
+
+// 计算单只股票收益率（组内计算）
+// 使用 context by SecurityID 避免跨股票计算错误 (Cross-Sectional Calculation)
+update data set Returns = ratios(LastPx) - 1 context by SecurityID
+
+// 生成透视表 (Pivot)
+// pivot by 能够自动将长表转换为宽表，自动处理行列索引
+wide_matrix = select Returns from data where isValid(Returns) pivot by DateTime, SecurityID
+
+// 3. 计算相关性矩阵 (Correlation Matrix)
+// 金融分析经常需要计算资产间的相关性以构建对冲组合
+print("\n--- 资产相关性矩阵 (Correlation Matrix) ---")
+// 获取除了第一列 DateTime 之外的数值列
+numeric_cols = slice(wide_matrix.colNames(), 1) // Slice from index 1 to end
+// 提取这些列的数据为元组 (Tuple of Vectors)
+matrix_data = wide_matrix[numeric_cols]
+
+// 使用 `cross` 积 (Cross Product) 高效计算所有两两组合的相关系数
+// cross(func, X, X) 会对 X 中的每一列两两应用 func
+corr_matrix = cross(corr, matrix_data, matrix_data)
+
+// 打印带有行列名的漂亮的矩阵
+// 这里我们只是打印数值矩阵，实际可以输出为 CSV
+print("资产列表: " + numeric_cols)
+print(corr_matrix)
+
+// 4. 单样本 T 检验 (One-Sample T-Test)
+// 检验假设: 某只股票的平均收益率是否显著不为 0 (Alpha Test)
+target = securityIDs[0]
+print("\n--- 收益率均值 T 检验 (" + target + ") ---")
+
+// 获取单只股票数据向量
+returns_vec = exec Returns from data where SecurityID=target and isValid(Returns)
+
+// 计算统计量 (Manual Calculation for Clarity)
+// T = (mean - mu) / (std / sqrt(n))
+mu = 0                  // 原假设均值
+n = count(returns_vec)  // 样本量
+mean_val = avg(returns_vec)
+std_val = std(returns_vec)
+se = std_val / sqrt(n)  // 标准误
+t_stat = (mean_val - mu) / se
+
+print("样本均值 (Mean): " + mean_val)
+print("样本标准差 (Std): " + std_val)
+print("样本量 (N): " + n)
+print("T 统计量 (T-Statistic): " + t_stat)
+
+// 临界值判断 (Critical Value Check)
+// 95% 置信水平双尾检验临界值约为 1.96
+critical_val = 1.96
+if(abs(t_stat) > critical_val) {
+    print("结论: 拒绝原假设 (Reject Null) - 收益率显著异于 0")
+} else {
+    print("结论: 无法拒绝原假设 (Fail to Reject) - 收益率均值可能为 0")
+}

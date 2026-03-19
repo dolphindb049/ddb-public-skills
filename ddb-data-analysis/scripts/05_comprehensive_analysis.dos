@@ -1,0 +1,168 @@
+// 05_comprehensive_analysis.dos
+// ----------------------------------------------------------------------------------
+// Comprehensive Data Analysis Pipeline: Indicators, Regression, and Backtesting
+// 
+// GOAL: Analyze stockMinKSH data, generating indicators and predicting future returns.
+// 
+// LESSONS LEARNED & BEST PRACTICES:
+// 1. Time-Series Splitting: Random splitting (like k-fold) leaks future information. 
+//    Use a time-based split (cutoff date).
+//    Ref: https://dolphindb.com/help/FunctionalProgramming/Cut.html?highlight=cut
+// 
+// 2. Handling Nulls: Indicators like MA/RSI introduce initial NaNs. 
+//    Regression functions (ols) handle NaNs by returning checks or fail. 
+//    Best practice: drop rows where any feature is null using `isNull` or `isValid`.
+// 
+// 3. Regression: `ols` returns a dictionary. To apply the model, use `dot` product.
+//    Ref: https://dolphindb.com/help/SQLFunctions/O/ols.html
+// 
+// ----------------------------------------------------------------------------------
+
+// 1. Configuration
+// Use a specific symbol to keep analysis focused.
+symbol = "000001.SZ"  // Example symbol (Ping An Bank)
+startDate = 2021.01.01
+endDate = 2021.06.30
+
+// 2. Load Data
+// We load raw data first.
+t = loadTable("dfs://stockMinKSH", "stockMinKSH_v2")
+
+// Filter data for the symbol and time range.
+// Optimizing: Use `select` with `where` on partitioned columns (DateTime, SecurityID)
+raw_data = select DateTime, OpenPx, HighPx, LowPx, LastPx, Volume 
+           from t 
+           where SecurityID = symbol, DateTime >= startDate, DateTime <= endDate
+           order by DateTime asc
+
+// Check if data is empty
+if(count(raw_data) == 0) {
+    print("No data found for symbol " + symbol + " in range.")
+    return
+}
+
+print("Loaded " + count(raw_data) + " rows for " + symbol)
+
+// 3. Feature Engineering
+// We will calculate:
+// - Log Return (Current)
+// - MA_5 (Moving Average 5 periods)
+// - RSI_14 (Relative Strength Index 14 periods)
+// - Volatility_20 (Standard Deviation of returns over 20 periods)
+
+// Load TA module if available, or define RSI manually
+try {   use ta; } catch(ex) { print("TA module not found, defining RSI manually"); }
+
+def rsi_manual(prices, window) {
+    deltas = prices - prev(prices);
+    gains = iif(deltas > 0, deltas, 0);
+    losses = iif(deltas < 0, abs(deltas), 0);
+    avgGain = mavg(gains, window);
+    avgLoss = mavg(losses, window);
+    rs = avgGain / avgLoss;
+    return 100 - (100 / (1 + rs));
+}
+
+// Update raw_data in place or create new table.
+update raw_data set LogReturn = log(LastPx / prev(LastPx))
+update raw_data set MA_5 = mavg(LastPx, 5)
+// Check if `rsi` exists, otherwise use `rsi_manual`
+try {
+    update raw_data set RSI_14 = rsi(LastPx, 14)
+} catch(ex) {
+    update raw_data set RSI_14 = rsi_manual(LastPx, 14)
+}
+update raw_data set Vol_20 = mstd(LogReturn, 20)
+
+// 4. Label Generation (Target)
+// We want to predict the *Next* period's return.
+// Shift LogReturn backwards by 1 (lead).
+update raw_data set Target = move(LogReturn, -1)
+
+// 5. Data Cleaning
+// Drop rows with NaNs (caused by window functions and lead/lag).
+// Features: MA_5, RSI_14, Vol_20.
+// Target: Target.
+clean_data = select DateTime, MA_5, RSI_14, Vol_20, Target 
+             from raw_data 
+             where isValid(MA_5) and isValid(RSI_14) and isValid(Vol_20) and isValid(Target)
+
+if(count(clean_data) < 100) {
+    print("Not enough data points for regression after cleaning. Points: " + count(clean_data));
+    return;
+}
+
+print("Cleaned data size: " + count(clean_data))
+
+// 6. Train/Test Split
+// Time-based split: 80% Train, 20% Test.
+split_idx = int(0.8 * count(clean_data))
+cutoff_time = clean_data.DateTime[split_idx]
+
+train_data = select * from clean_data where DateTime <= cutoff_time
+test_data = select * from clean_data where DateTime > cutoff_time
+
+print("Train size: " + count(train_data) + ", Test size: " + count(test_data))
+
+// 7. Regression (OLS)
+// Model: Target ~ MA_5 + RSI_14 + Vol_20 + Intercept
+// `ols` expects y, x.
+// Prepare X and Y matrices.
+// Note: ols automatically adds intercept if intercept=true (default).
+
+y_train = train_data.Target
+x_train = table(train_data.MA_5 as MA_5, train_data.RSI_14 as RSI_14, train_data.Vol_20 as Vol_20)
+
+model = ols(y_train, x_train, true, 2) // 2 = output full regression stats
+
+print("Regression Results:")
+print(model.Coefficient) // Print the full coefficient table
+// R2 is in RegressionStat dictionary.
+// If R2 column is not found, maybe key is "R2" in a dictionary?
+// Let's just print the RegressionStat to see structure and extract R2 manually if needed.
+print("RegressionStat:")
+print(model.RegressionStat)
+
+// Try to access R2 assuming it is a dict key if possible, or skip if table column fails.
+try { r2_val = model.RegressionStat["R2"]; } catch(ex) { r2_val = 0.0; }
+print("R2: " + r2_val)
+
+
+// 8. Prediction & Evaluation
+// Apply model to Test Set.
+// Helper function to extract coefficients.
+// Based on debugging, column 0 is factor names. Column 1 should be Beta/Estimate.
+coeffs = values(model.Coefficient)[1]
+
+// Check size of coeffs
+print("Coeffs size: " + count(coeffs))
+print("Coeffs: " + string(coeffs))
+
+// If size is 4, valid indices are 0, 1, 2, 3.
+// DolphinDB v[0:3] typically returns 3 elements (0, 1, 2).
+// If intercept is FIRST (which is typical for DolphinDB OLS table output when intercept=true)
+// Order based on previous debug: [Intercept, MA_5, RSI_14, Vol_20]
+intercept = coeffs[0]
+weights = coeffs[1:]
+
+// Ensure weights align with features: MA_5, RSI_14, Vol_20
+w0 = double(weights[0])
+w1 = double(weights[1])
+w2 = double(weights[2])
+inter = double(intercept)
+
+y_pred = (test_data.MA_5 * w0) + (test_data.RSI_14 * w1) + (test_data.Vol_20 * w2) + inter
+
+
+// Metrics
+// RMSE
+error = y_pred - y_test
+rmse = sqrt(avg(error * error))
+mae = avg(abs(error))
+
+print("Evaluation on Test Set:")
+print("RMSE: " + rmse)
+print("MAE: " + mae)
+
+// Return a summary string to view results
+"Analysis Completed Successfully. RMSE=" + string(rmse) + ", MAE=" + string(mae) + ", R2=" + string(r2_val)

@@ -1,0 +1,13 @@
+// Define a function
+def add_numbers(a, b) {
+    return a + b;
+}
+
+// Call the function
+print("1. Calling function add_numbers(100, 200)...");
+res = add_numbers(100, 200);
+
+print("2. The result is: " + string(res));
+
+// Return the result so it shows up in Python
+res;

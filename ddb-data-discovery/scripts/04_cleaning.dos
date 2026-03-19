@@ -1,0 +1,82 @@
+// ============================================================
+// 04_cleaning.dos — 数据质量检查：NULL统计、重复检测、基础清洗
+// ============================================================
+// 适用场景：评估数据可用性，为后续分析做准备
+// 前置依赖：已通过 03_queries.dos 了解数据基本面貌
+
+// --- 配置参数 (USER CONFIG) ---
+dbPath = "dfs://minute_factor"
+tableName = "stock_minute_1m"
+checkDate = 2026.03.10             // 选一个数据量较大的日期做深度检查
+
+// ── Step 1: 全列 NULL 统计 ──
+// 技巧: 用 iif(isNull(col), 1, 0) + sum 批量统计每列的空值数
+// DDB 没有 count_null 之类的快捷函数
+t = loadTable(dbPath, tableName)
+
+print("=== 全列 NULL 统计 ===")
+select count(*) as total,
+    sum(iif(isNull(ts_code), 1, 0)) as null_ts_code,
+    sum(iif(isNull(trade_date), 1, 0)) as null_trade_date,
+    sum(iif(isNull(trade_time), 1, 0)) as null_trade_time,
+    sum(iif(isNull(open), 1, 0)) as null_open,
+    sum(iif(isNull(high), 1, 0)) as null_high,
+    sum(iif(isNull(low), 1, 0)) as null_low,
+    sum(iif(isNull(close), 1, 0)) as null_close,
+    sum(iif(isNull(vol), 1, 0)) as null_vol,
+    sum(iif(isNull(amount), 1, 0)) as null_amount,
+    sum(iif(isNull(pre_close), 1, 0)) as null_pre_close,
+    sum(iif(isNull(change), 1, 0)) as null_change,
+    sum(iif(isNull(pct_chg), 1, 0)) as null_pct_chg
+from t
+
+// ── Step 2: 重复行检测 ──
+// 业务逻辑: 同一只股票(ts_code)+同一分钟(trade_time) 不应出现多次
+// 用 group by + having count(*) > 1 找出违规记录
+print("\n=== 重复行检测 (指定日期) ===")
+dup_check = select count(*) as cnt from t
+    where trade_date = checkDate
+    group by ts_code, trade_time
+    having count(*) > 1
+dup_count = exec count(*) from dup_check
+print("重复组数: " + string(dup_count))
+if(dup_count > 0) { print(select top 10 * from dup_check) }
+
+// ── Step 3: 每只股票的 bar 数量一致性 ──
+// A股分钟线正常应该是 241 bar/天 (9:30-11:30=120min, 13:00-15:00=120min, +收盘1)
+print("\n=== 每只股票的 bar 数量分布 (指定日期) ===")
+bar_dist = select count(*) as bar_count from t
+    where trade_date = checkDate
+    group by ts_code
+
+// 检查 bar_count 的分布
+select bar_count, count(*) as stock_count
+from bar_dist group by bar_count order by stock_count desc
+
+// ── Step 4: 异常值初筛 ──
+// 价格为0或负数的行
+print("\n=== 异常价格 (close <= 0) ===")
+bad_prices = select count(*) as cnt from t where close <= 0
+print(bad_prices)
+
+// 成交量为负数
+print("\n=== 异常成交量 (vol < 0) ===")
+bad_vol = select count(*) as cnt from t where vol < 0
+print(bad_vol)
+
+// ── Step 5: 数据填充示例 (在内存表上操作，不改原表) ──
+// 将单只股票单日数据加载到内存表进行清洗演示
+print("\n=== 清洗演示: 前向填充 pre_close ===")
+sample = select * from t where trade_date = checkDate, ts_code = "000153.SZ"
+
+// ffill: 前向填充（用前一个非NULL值填充后续NULL）
+update sample set pre_close = ffill(pre_close)
+
+// nullFill: 指定值填充（如成交量缺失补0）
+update sample set vol = nullFill(vol, 0)
+
+// 检查清洗效果
+print("清洗后 NULL 残留: ")
+select sum(iif(isNull(pre_close), 1, 0)) as remaining_null_pre_close,
+       sum(iif(isNull(vol), 1, 0)) as remaining_null_vol
+from sample

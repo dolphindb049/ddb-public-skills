@@ -1,0 +1,48 @@
+
+<!doctype html>
+<html>
+<head>
+  <meta charset='utf-8'/>
+    <title>债券数据走势分析报告</title>
+  <script src='https://cdn.plot.ly/plotly-2.35.2.min.js'></script>
+  <style>
+        body {font-family: Arial, sans-serif; margin: 20px; background:#f7f9fc; color:#212529;}
+        h1 {margin-bottom: 6px;}
+        .subtitle {color:#5f6b7a; margin-bottom: 16px;}
+        .tabs button {margin-right: 8px; padding: 8px 12px; border:1px solid #d7deea; border-radius: 6px; background:white; cursor:pointer;}
+    .tabpage {display: none; margin-top: 12px;}
+        .card {border:1px solid #dde3ef; border-radius: 10px; padding: 14px; margin-bottom: 12px; background:white;}
+    table {border-collapse: collapse; width: 100%;}
+        th, td {border:1px solid #dde3ef; padding: 8px; font-size: 13px;}
+        th {background: #f2f5fb;}
+    .plot {height: 360px;}
+        pre {background:#f8f9fb; border:1px solid #e6ebf4; padding: 10px; overflow:auto;}
+  </style>
+</head>
+<body>
+    <h1>债券数据走势分析报告</h1>
+    <div class='subtitle'>收益率、价格、成交量与分布特征</div>
+  <div class='tabs'><button onclick="openTab('tab_0')">走势</button><button onclick="openTab('tab_1')">统计</button></div><div id='tab_0' class='tabpage'><section class='card'><h3>关键期限收益率走势</h3>
+<div id='plot_0' class='plot'></div>
+</section>
+<section class='card'><h3>价格与成交量标准化走势</h3>
+<div id='plot_1' class='plot'></div>
+</section></div><div id='tab_1' class='tabpage'><section class='card'><h3>区间统计摘要</h3>
+<table><thead><tr><th>指标</th><th>2Y</th><th>5Y</th><th>10Y</th></tr></thead><tbody><tr><td>平均收益率(%)</td><td>1.67</td><td>2.0</td><td>2.36</td></tr><tr><td>波动率(%)</td><td>0.028</td><td>0.036</td><td>0.041</td></tr><tr><td>最大回撤(%)</td><td>-0.021</td><td>-0.032</td><td>-0.038</td></tr><tr><td>变化幅度(bp)</td><td>9</td><td>16</td><td>17</td></tr></tbody></table>
+</section>
+<section class='card'><h3>5Y 日变化(bp)分布</h3>
+<div id='plot_2' class='plot'></div>
+</section></div>
+  <script>
+    function openTab(id) {
+      document.querySelectorAll('.tabpage').forEach(el => el.style.display='none');
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'block';
+    }
+    Plotly.newPlot('plot_0', [{"x": ["01-02", "01-09", "01-16", "01-23", "01-30", "02-06", "02-13", "02-20"], "y": [1.62, 1.64, 1.66, 1.68, 1.65, 1.67, 1.69, 1.71], "type": "scatter", "mode": "lines+markers", "name": "2Y"}, {"x": ["01-02", "01-09", "01-16", "01-23", "01-30", "02-06", "02-13", "02-20"], "y": [1.92, 1.95, 1.98, 2.01, 1.99, 2.03, 2.05, 2.08], "type": "scatter", "mode": "lines+markers", "name": "5Y"}, {"x": ["01-02", "01-09", "01-16", "01-23", "01-30", "02-06", "02-13", "02-20"], "y": [2.28, 2.31, 2.34, 2.37, 2.35, 2.39, 2.42, 2.45], "type": "scatter", "mode": "lines+markers", "name": "10Y"}], {"title": "关键期限收益率走势", "xaxis": {"title": "日期"}, "yaxis": {"title": "收益率(%)"}, "legend": {"orientation": "h", "y": -0.2}, "margin": {"l": 50, "r": 30, "t": 50, "b": 60}}, {responsive: true});
+Plotly.newPlot('plot_1', [{"x": ["01-02", "01-09", "01-16", "01-23", "01-30", "02-06", "02-13", "02-20"], "y": [100, 99.8, 99.6, 99.4, 99.5, 99.2, 99.0, 98.8], "type": "scatter", "mode": "lines+markers", "name": "价格(标准化)"}, {"x": ["01-02", "01-09", "01-16", "01-23", "01-30", "02-06", "02-13", "02-20"], "y": [100, 103, 106, 110, 108, 112, 115, 118], "type": "scatter", "mode": "lines+markers", "name": "成交量(标准化)"}], {"title": "价格与成交量标准化走势", "xaxis": {"title": "日期"}, "yaxis": {"title": "标准化值"}, "legend": {"orientation": "h", "y": -0.2}, "margin": {"l": 50, "r": 30, "t": 50, "b": 60}}, {responsive: true});Plotly.newPlot('plot_2', [{"x": [1, 2, -1, 3, 0, -2, 1, 2, -1, 1, 0, 2, -2, 3, 1], "type": "histogram", "name": "5Y Daily Δ"}], {"title": "5Y 日变化(bp)分布", "xaxis": {"title": "日变化(bp)"}, "yaxis": {"title": "频数"}, "legend": {"orientation": "h", "y": -0.2}, "margin": {"l": 50, "r": 30, "t": 50, "b": 60}}, {responsive: true});
+    const firstTab = document.querySelector('.tabpage');
+    if (firstTab) firstTab.style.display = 'block';
+  </script>
+</body>
+</html>

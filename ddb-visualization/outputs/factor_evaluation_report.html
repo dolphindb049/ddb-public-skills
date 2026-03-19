@@ -1,0 +1,52 @@
+
+<!doctype html>
+<html>
+<head>
+  <meta charset='utf-8'/>
+    <title>因子评价全流程报告</title>
+  <script src='https://cdn.plot.ly/plotly-2.35.2.min.js'></script>
+  <style>
+        body {font-family: Arial, sans-serif; margin: 20px; background:#f7f9fc; color:#212529;}
+        h1 {margin-bottom: 6px;}
+        .subtitle {color:#5f6b7a; margin-bottom: 16px;}
+        .tabs button {margin-right: 8px; padding: 8px 12px; border:1px solid #d7deea; border-radius: 6px; background:white; cursor:pointer;}
+    .tabpage {display: none; margin-top: 12px;}
+        .card {border:1px solid #dde3ef; border-radius: 10px; padding: 14px; margin-bottom: 12px; background:white;}
+    table {border-collapse: collapse; width: 100%;}
+        th, td {border:1px solid #dde3ef; padding: 8px; font-size: 13px;}
+        th {background: #f2f5fb;}
+    .plot {height: 360px;}
+        pre {background:#f8f9fb; border:1px solid #e6ebf4; padding: 10px; overflow:auto;}
+  </style>
+</head>
+<body>
+    <h1>因子评价全流程报告</h1>
+    <div class='subtitle'>分层统计、分层收益曲线、IC 横截面对比、多空收益分布</div>
+  <div class='tabs'><button onclick="openTab('tab_0')">总览</button><button onclick="openTab('tab_1')">收益与IC</button></div><div id='tab_0' class='tabpage'><section class='card'><h3>结论摘要</h3>
+<div class='md'>短周期 IC 为正，长周期衰减；分层累计收益具备单调性。</div>
+</section>
+<section class='card'><h3>分层统计</h3>
+<table><thead><tr><th>分层</th><th>样本数</th><th>均值</th><th>标准差</th><th>年化换手</th></tr></thead><tbody><tr><td>Q1</td><td>1200</td><td>-0.012</td><td>0.121</td><td>2.4</td></tr><tr><td>Q2</td><td>1200</td><td>-0.004</td><td>0.108</td><td>2.1</td></tr><tr><td>Q3</td><td>1200</td><td>0.003</td><td>0.101</td><td>1.9</td></tr><tr><td>Q4</td><td>1200</td><td>0.009</td><td>0.097</td><td>1.7</td></tr><tr><td>Q5</td><td>1200</td><td>0.015</td><td>0.093</td><td>1.6</td></tr></tbody></table>
+</section></div><div id='tab_1' class='tabpage'><section class='card'><h3>分层累计收益率曲线</h3>
+<div id='plot_0' class='plot'></div>
+</section>
+<section class='card'><h3>IC 均值（不同预测周期）</h3>
+<div id='plot_1' class='plot'></div>
+</section>
+<section class='card'><h3>多空收益分布</h3>
+<div id='plot_2' class='plot'></div>
+</section></div>
+  <script>
+    function openTab(id) {
+      document.querySelectorAll('.tabpage').forEach(el => el.style.display='none');
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'block';
+    }
+    Plotly.newPlot('plot_0', [{"x": ["M1", "M2", "M3", "M4", "M5", "M6"], "y": [0.0, -0.6, -1.0, -1.2, -1.1, -1.3], "type": "scatter", "mode": "lines+markers", "name": "Q1"}, {"x": ["M1", "M2", "M3", "M4", "M5", "M6"], "y": [0.0, 0.1, 0.2, 0.2, 0.3, 0.4], "type": "scatter", "mode": "lines+markers", "name": "Q3"}, {"x": ["M1", "M2", "M3", "M4", "M5", "M6"], "y": [0.0, 0.7, 1.1, 1.4, 1.8, 2.1], "type": "scatter", "mode": "lines+markers", "name": "Q5"}], {"title": "分层累计收益率曲线", "xaxis": {"title": "月份"}, "yaxis": {"title": "累计收益(%)"}, "legend": {"orientation": "h", "y": -0.2}, "margin": {"l": 50, "r": 30, "t": 50, "b": 60}}, {responsive: true});
+Plotly.newPlot('plot_1', [{"x": ["1D", "5D", "10D", "20D"], "y": [0.045, 0.028, 0.01, -0.004], "type": "bar", "name": "IC Mean"}], {"title": "IC 均值（不同预测周期）", "xaxis": {"title": "预测周期"}, "yaxis": {"title": "IC"}, "legend": {"orientation": "h", "y": -0.2}, "margin": {"l": 50, "r": 30, "t": 50, "b": 60}}, {responsive: true});
+Plotly.newPlot('plot_2', [{"x": [0.6, -0.2, 0.4, 1.0, -0.5, 0.1, 0.2, -0.1, 0.8, 0.3, -0.4, 0.7], "type": "histogram", "name": "Top-Bottom Spread"}], {"title": "多空收益分布", "xaxis": {"title": "收益(%)"}, "yaxis": {"title": "频数"}, "legend": {"orientation": "h", "y": -0.2}, "margin": {"l": 50, "r": 30, "t": 50, "b": 60}}, {responsive: true});
+    const firstTab = document.querySelector('.tabpage');
+    if (firstTab) firstTab.style.display = 'block';
+  </script>
+</body>
+</html>

@@ -1,0 +1,32 @@
+// ============================================================
+// 01_exploration.dos — 全库扫描：发现所有数据库和表
+// ============================================================
+// 适用场景：初次连接陌生 DolphinDB 集群，快速了解有哪些数据资产
+// 执行方式：uv run execute.py 01_exploration.dos --host <IP> --port <PORT>
+// 注意：本脚本纯只读，不会修改任何数据
+
+// ── Step 1: 列出所有 DFS 数据库 ──
+// getDFSDatabases() 返回一个字符串向量，每个元素是一个 dfs:// 路径
+all_dbs = getDFSDatabases()
+print("=== 发现的数据库 (" + string(size(all_dbs)) + " 个) ===")
+print(all_dbs)
+
+// ── Step 2: 列出所有 DFS 表 (全局) ──
+// getDFSTables() 不接受参数，返回所有表的全路径
+all_tables = getDFSTables()
+print("\n=== 发现的 DFS 表 (" + string(size(all_tables)) + " 个) ===")
+print(all_tables)
+
+// ── Step 3: 按数据库列出表 (推荐) ──
+// getDFSTablesByDatabase(dbPath) 接受一个数据库路径参数
+// ⚠️ 注意区分: getDFSTables() 无参数, getDFSTablesByDatabase() 需要参数
+// 下面遍历每个数据库，列出其中的表
+for(dbPath in all_dbs) {
+    tables_in_db = getDFSTablesByDatabase(dbPath)
+    print("\n--- " + dbPath + " (" + string(size(tables_in_db)) + " 张表) ---")
+    print(tables_in_db)
+}
+
+// ── 输出说明 ──
+// 后续操作: 选中你感兴趣的数据库和表名，填入 02_structure.dos 的配置区域
+// 例如: dbPath = "dfs://minute_factor", tableName = "stock_minute_1m"

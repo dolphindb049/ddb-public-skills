@@ -1,0 +1,22 @@
+{
+  "jobs": [
+    {
+      "id": "factor_eval_flow",
+      "specFile": "./spec.factor_eval.json",
+      "outSpec": ".github/skills/ddb-visualization/outputs/factor_evaluation_report.spec.json",
+      "outHtml": ".github/skills/ddb-visualization/outputs/factor_evaluation_report.html"
+    },
+    {
+      "id": "ficc_pricing_flow",
+      "specFile": "./spec.ficc_pricing.json",
+      "outSpec": ".github/skills/ddb-visualization/outputs/ficc_pricing_report.spec.json",
+      "outHtml": ".github/skills/ddb-visualization/outputs/ficc_pricing_report.html"
+    },
+    {
+      "id": "bond_trend_flow",
+      "specFile": "./spec.bond_trend.json",
+      "outSpec": ".github/skills/ddb-visualization/outputs/bond_trend_report.spec.json",
+      "outHtml": ".github/skills/ddb-visualization/outputs/bond_trend_report.html"
+    }
+  ]
+}

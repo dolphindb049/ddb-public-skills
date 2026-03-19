@@ -1,0 +1,49 @@
+
+<!doctype html>
+<html>
+<head>
+  <meta charset='utf-8'/>
+    <title>FICC 债券定价流程报告</title>
+  <script src='https://cdn.plot.ly/plotly-2.35.2.min.js'></script>
+  <style>
+        body {font-family: Arial, sans-serif; margin: 20px; background:#f7f9fc; color:#212529;}
+        h1 {margin-bottom: 6px;}
+        .subtitle {color:#5f6b7a; margin-bottom: 16px;}
+        .tabs button {margin-right: 8px; padding: 8px 12px; border:1px solid #d7deea; border-radius: 6px; background:white; cursor:pointer;}
+    .tabpage {display: none; margin-top: 12px;}
+        .card {border:1px solid #dde3ef; border-radius: 10px; padding: 14px; margin-bottom: 12px; background:white;}
+    table {border-collapse: collapse; width: 100%;}
+        th, td {border:1px solid #dde3ef; padding: 8px; font-size: 13px;}
+        th {background: #f2f5fb;}
+    .plot {height: 360px;}
+        pre {background:#f8f9fb; border:1px solid #e6ebf4; padding: 10px; overflow:auto;}
+  </style>
+</head>
+<body>
+    <h1>FICC 债券定价流程报告</h1>
+    <div class='subtitle'>收益率曲线、二维/三维曲面、误差分析与参数表</div>
+  <div class='tabs'><button onclick="openTab('tab_0')">曲线</button><button onclick="openTab('tab_1')">曲面与误差</button></div><div id='tab_0' class='tabpage'><section class='card'><h3>基准曲线 vs 模型曲线</h3>
+<div id='plot_0' class='plot'></div>
+</section></div><div id='tab_1' class='tabpage'><section class='card'><h3>二维收益率曲面（期限 × 信用等级）</h3>
+<div id='plot_1' class='plot'></div>
+</section>
+<section class='card'><h3>三维收益率曲面（期限 × 时间 × 收益率）</h3>
+<div id='plot_2' class='plot'></div>
+</section>
+<section class='card'><h3>定价误差（bp）及不确定性</h3>
+<div id='plot_3' class='plot'></div>
+</section></div>
+  <script>
+    function openTab(id) {
+      document.querySelectorAll('.tabpage').forEach(el => el.style.display='none');
+      const el = document.getElementById(id);
+      if (el) el.style.display = 'block';
+    }
+    Plotly.newPlot('plot_0', [{"x": ["1Y", "2Y", "3Y", "5Y", "7Y", "10Y"], "y": [1.75, 1.82, 1.95, 2.15, 2.28, 2.45], "type": "scatter", "mode": "lines+markers", "name": "Market"}, {"x": ["1Y", "2Y", "3Y", "5Y", "7Y", "10Y"], "y": [1.78, 1.84, 1.96, 2.12, 2.26, 2.43], "type": "scatter", "mode": "lines+markers", "name": "Model"}], {"title": "基准曲线 vs 模型曲线", "xaxis": {"title": "期限"}, "yaxis": {"title": "收益率(%)"}, "legend": {"orientation": "h", "y": -0.2}, "margin": {"l": 50, "r": 30, "t": 50, "b": 60}}, {responsive: true});Plotly.newPlot('plot_1', [{"x": ["1Y", "3Y", "5Y", "10Y"], "y": ["AAA", "AA+", "AA", "AA-"], "z": [[1.65, 1.82, 2.01, 2.28], [1.78, 1.96, 2.15, 2.43], [1.92, 2.12, 2.35, 2.66], [2.08, 2.31, 2.58, 2.92]], "type": "heatmap", "colorscale": "YlGnBu"}], {"title": "二维收益率曲面（期限 × 信用等级）", "xaxis": {"title": "期限"}, "yaxis": {"title": "信用等级"}, "legend": {"orientation": "h", "y": -0.2}, "margin": {"l": 50, "r": 30, "t": 50, "b": 60}}, {responsive: true});
+Plotly.newPlot('plot_2', [{"x": [1, 2, 3, 5, 7, 10], "y": ["T-4", "T-3", "T-2", "T-1", "T"], "z": [[1.72, 1.8, 1.92, 2.11, 2.24, 2.4], [1.74, 1.81, 1.93, 2.13, 2.25, 2.41], [1.76, 1.83, 1.95, 2.14, 2.26, 2.42], [1.77, 1.84, 1.96, 2.15, 2.27, 2.43], [1.78, 1.85, 1.97, 2.16, 2.28, 2.44]], "type": "surface", "colorscale": "Viridis", "showscale": true}], {"title": "三维收益率曲面（期限 × 时间 × 收益率）", "xaxis": {"title": "期限(年)"}, "yaxis": {"title": "估值时点"}, "legend": {"orientation": "h", "y": -0.2}, "margin": {"l": 50, "r": 30, "t": 50, "b": 60}, "scene": {"xaxis": {"title": "期限(年)"}, "yaxis": {"title": "估值时点"}, "zaxis": {"title": "收益率(%)"}}}, {responsive: true});
+Plotly.newPlot('plot_3', [{"x": ["BondA", "BondB", "BondC", "BondD", "BondE"], "y": [2.3, -1.6, 0.9, -0.5, 1.1], "type": "bar", "name": "Pricing Error", "error_y": {"type": "data", "array": [0.8, 0.6, 0.5, 0.4, 0.7], "visible": true}, "marker": {"opacity": 0.85}}], {"title": "定价误差（bp）及不确定性", "xaxis": {"title": "债券"}, "yaxis": {"title": "误差(bp)"}, "legend": {"orientation": "h", "y": -0.2}, "margin": {"l": 50, "r": 30, "t": 50, "b": 60}}, {responsive: true});
+    const firstTab = document.querySelector('.tabpage');
+    if (firstTab) firstTab.style.display = 'block';
+  </script>
+</body>
+</html>

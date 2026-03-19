@@ -1,0 +1,46 @@
+// 脚本功能：金融指标计算 (Risk & Returns)
+// 包含：收益率 (Log/Simple Returns), 滚动波动率 (Rolling Volatility), 向量化计算
+// 方法论：利用 DolphinDB 的 `context by` 确保计算在正确的时间组内进行
+
+// --- 配置参数 (USER CONFIG) ---
+dbPath = "dfs://stockMinKSH"          
+tableName = "stockMinKSH_v2" 
+securityID = "000001.SZ"
+
+// 1. 加载数据 (Load Data)
+db = database(dbPath)
+t_stats = loadTable(db, tableName)
+
+// 2. 准备内存表 (Prepare In-Memory Table)
+// 为了演示向量化操作，我们将筛选后的数据拉到内存
+// 注意：大规模计算时建议使用 SQL `update` 直接在 DFS 表上操作（如果引擎支持）或者使用 `select` 产生新表
+// 这里为了后续方便展示，我们先拉取数据
+print("正在加载数据: " + securityID)
+data = select SecurityID, DateTime, LastPx from t_stats where SecurityID=securityID order by DateTime
+
+// 3. 计算收益率 (Calculate Returns)
+// ratios(x) 返回 x[i]/x[i-1]
+// log(ratios(x)) 即为对数收益率 (Log Returns)，或者 ratios(x) - 1 为简单收益率
+// update 语句会直接修改内存表 `data`
+update data set Returns = ratios(LastPx) - 1
+
+// 4. 计算滚动波动率 (Rolling Volatility)
+// mstd(x, window) 是移动窗口标准差，非常高效
+// 窗口大小设为 30，即过去 30 分钟的收益率波动
+update data set Volatility30 = mstd(Returns, 30)
+
+// 5. 展示结果
+print("--- 收益率与波动率 (前 20 条) ---")
+print(select DateTime, LastPx, Returns, Volatility30 from data where isValid(Volatility30) limit 20)
+
+// 6. 聚合统计 (Annualized Volatility)
+// 将分钟波动率聚合为日度波动率，并年化
+print("\n--- 年化每日波动率 (Annualized Daily Volatility) ---")
+// 假设每天交易 240 分钟 (4小时)，每年 252 个交易日
+annualization_factor = sqrt(240 * 252)
+
+daily_vol = select std(Returns) * annualization_factor as AnnualizedVol 
+            from data 
+            group by date(DateTime) as Date
+
+print(select top 10 * from daily_vol order by Date desc)

@@ -1,0 +1,58 @@
+// 脚本功能：线性回归分析 (Linear Regression)
+// 包含：OLS (最小二乘法), Beta 计算, 残差分析
+// 方法论：基于 DolphinDB 的 BLAS/LAPACK 底层优化进行矩阵运算
+
+// --- 配置参数 (USER CONFIG) ---
+dbPath = "dfs://stockMinKSH"          
+tableName = "stockMinKSH_v2" 
+securityID = "000001.SZ"
+
+// 1. 加载数据
+db = database(dbPath)
+t = loadTable(db, tableName)
+
+print("加载数据: " + securityID)
+data = select SecurityID, DateTime, LastPx from t where SecurityID=securityID order by DateTime
+
+// 2. 准备回归变量 (Prepare Variables)
+// 我们构建一个简单的自回归模型 (AR1 Model)
+// 模型: Returns_t = alpha + beta * Returns_{t-1} + error
+// 用途: 测试动量效应 (Momentum) 或均值回归 (Mean Reversion)
+
+// 计算当期收益率
+update data set Returns = ratios(LastPx) - 1
+
+// 计算滞后收益率 (Lagged Returns)，作为自变量 X
+update data set LaggedReturns = prev(Returns)
+
+// 3. 数据清洗 (Remove NaN)
+// 回归之前必须去除 NaN (第一条 ratios 和第一条 prev 都是 NaN)
+reg_data = select Returns, LaggedReturns from data where isValid(Returns) and isValid(LaggedReturns)
+
+// 4. 执行 OLS 回归 (Run OLS)
+// ols(y, x, intercept, mode)
+// mode=2 返回详细的统计信息字典 (ANOVA, R2, etc.)
+print("\n--- 执行 OLS 回归: Returns_t ~ Returns_{t-1} ---")
+model = ols(reg_data.Returns, reg_data.LaggedReturns, true, 2)
+
+// 5. 解读结果 (Interpret Results)
+// 打印整个模型摘要
+print(model)
+
+// 提取 Beta 系数 (斜率)
+// 这里的 beta 是列名，不是希腊字母 Beta
+slope_beta = model.Coefficient.beta[1]
+print("\n--- 回归系数 (Beta) ---")
+print("Beta (Slope): " + slope_beta)
+
+// 业务解释
+if(slope_beta > 0) {
+    print("结论: 发现正自相关 (动量效应 Momentum) - 过去的收益能正向预测未来")
+} else {
+    print("结论: 发现负自相关 (均值回归 Reversion) - 涨多了会跌，跌多了会涨")
+}
+
+// 6. 残差检查 (Residual Check)
+// 残差均值为 0 是 OLS 基本假设
+print("\n--- 残差均值 (Residual Mean) ---")
+print(avg(model.Residual))
