@@ -12,6 +12,7 @@ A curated set of open-source Agent Skills for DolphinDB scripting, data engineer
 | [ddb-cross-node-sync](./ddb-cross-node-sync) | 跨节点数据拉取与落地同步 (xdb + remoteRun) |
 | [ddb-visualization](./ddb-visualization) | 参数化图表编排，生成金融业务报告 |
 | [ddb-deployment-skill](./ddb-deployment-skill) | 单节点部署、高可用集群搭建与安全改造 |
+| [ficc-pricing](./ficc-pricing) | FICC 定价规范:债券/利率/外汇/商品期货期权/权益期权等 13 类资产的 instrument、曲线/曲面构造与 pricer 调用 |
 
 ## Usage
 
